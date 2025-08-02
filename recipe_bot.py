@@ -8,12 +8,16 @@ from jinja2 import Environment, FileSystemLoader
 # Load environment variables
 load_dotenv()
 
+import braintrust
+
 # Set page config
 st.set_page_config(
     page_title="Recipe Bot",
     page_icon="🍳",
     layout="centered"
 )
+
+braintrust.init(project="recipe-bot")
 
 class RecipeBot:
     def __init__(self):
@@ -25,6 +29,7 @@ class RecipeBot:
         # Load system prompt from template
         self.system_prompt = self._load_system_prompt()
     
+    @braintrust.traced(name="load_system_prompt")
     def _load_system_prompt(self, additional_context=None):
         """Load and render the system prompt from Jinja2 template"""
         try:
@@ -45,6 +50,7 @@ class RecipeBot:
             
             Keep your responses helpful, friendly, and focused on recipes and cooking."""
 
+    @braintrust.traced(name="get_ai_response")
     def get_ai_response(self, user_message, conversation_history):
         """Get AI response - can be easily swapped for different models"""
         if not self.client:
@@ -125,12 +131,13 @@ def main():
         
         # Get AI response
         with st.chat_message("assistant"):
-            with st.spinner("Thinking of a delicious response..."):
-                response = st.session_state.bot.get_ai_response(
-                    prompt, 
-                    st.session_state.messages[:-1]  # Exclude the current message
-                )
-            st.write(response)
+            with braintrust.start_span(name="Assistant Response"):
+                with st.spinner("Thinking of a delicious response..."):
+                    response = st.session_state.bot.get_ai_response(
+                        prompt, 
+                        st.session_state.messages[:-1]  # Exclude the current message
+                    )
+                st.write(response)
         
         # Add AI response to chat history
         st.session_state.messages.append({"role": "assistant", "content": response})
